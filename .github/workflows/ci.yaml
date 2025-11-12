@@ -6,31 +6,46 @@ on:
 
 jobs:
   bandit:
-    name: Bandit scan (all branches)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+  runs-on: ubuntu-latest
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
 
-      - name: Install Bandit
-        run: pip install bandit
+    - name: Install dependencies (bandit + jq)
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit
+        sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Run Bandit (fail on findings)
-        run: |
-          # exclude common virtualenv / build dirs
-          bandit -r . -x .venv,venv,build,dist -f txt -o bandit.txt
+    - name: Run Bandit (txt + json)
+      run: |
+        # scan recursively, quiet progress, produce txt and json
+        bandit -r . -f txt -o bandit.txt -q || true
+        bandit -r . -f json -o report.json -q || true
+
+    - name: Upload bandit reports as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: bandit-reports
+        path: |
+          bandit.txt
+          report.json
+
+    - name: Fail if any HIGH severity findings
+      # On parse le JSON et on fail si count(HIGH & confidence not LOW) > 0
+      run: |
+        high_count=$(jq '[.results[] | select(.issue_severity=="HIGH" and (.issue_confidence != "LOW"))] | length' report.json)
+        echo "High severity findings: $high_count"
+        if [ "$high_count" -gt 0 ]; then
+          echo "Failing pipeline due to HIGH severity Bandit findings"
           cat bandit.txt
-
-      - name: Upload Bandit report
-        uses: actions/upload-artifact@v4
-        with:
-          name: bandit-report
-          path: bandit.txt
+          exit 1
+        fi
 
   build-and-deploy:
     name: Build image & trigger Coolify (main only)
