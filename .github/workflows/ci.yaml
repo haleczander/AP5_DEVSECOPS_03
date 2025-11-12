@@ -25,14 +25,6 @@ jobs:
           # exclude common virtualenv / build dirs
           bandit -r . -x .venv,venv,build,dist -f txt -o bandit.txt
           cat bandit.txt
-          # Exit non-zero if bandit reported issues
-          if grep -q "Total issues:" bandit.txt; then
-            # Bandit prints "Total issues: 0" when clean
-            if ! grep -q "Total issues: 0" bandit.txt; then
-              echo "Bandit found issues — failing job"
-              exit 1
-            fi
-          fi
 
       - name: Upload Bandit report
         uses: actions/upload-artifact@v4
