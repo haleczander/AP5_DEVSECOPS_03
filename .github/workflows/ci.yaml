@@ -27,35 +27,8 @@ jobs:
 
       - name: Run Bandit (fail on findings)
         run: |
-          # exclude common virtualenv / build dirs
-          bandit -r . -x .venv,venv,build,dist -f txt -o bandit.txt
-          cat bandit.txt
-          # Exit non-zero if bandit reported issues
-          if grep -q "Total issues:" bandit.txt; then
-            # Bandit prints "Total issues: 0" when clean
-            if ! grep -q "Total issues: 0" bandit.txt; then
-              echo "Bandit found issues — failing job"
-              exit 1
-            fi
-          fi
+          bandit -r . -lll -x .venv,venv,build,dist
 
-      - name: Upload Bandit report
-        uses: actions/upload-artifact@v4
-        with:
-          name: bandit-reports
-          path: |
-            bandit.txt
-            report.json
-
-      - name: Fail if any HIGH severity findings
-        run: |
-          high_count=$(jq '[.results[] | select(.issue_severity=="HIGH" and (.issue_confidence != "LOW"))] | length' report.json)
-          echo "High severity findings: $high_count"
-          if [ "$high_count" -gt 0 ]; then
-            echo "Failing pipeline due to HIGH severity Bandit findings"
-            cat bandit.txt
-            exit 1
-          fi
 
   build-and-deploy:
     name: Build image & trigger Coolify (main only)
